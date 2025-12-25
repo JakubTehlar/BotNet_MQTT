@@ -1,10 +1,13 @@
 import argparse
-from globvars import PROTOCOL_VERSION, MAX_FRAME_SIZE, MIN_FRAME_SIZE, TIME_WINDOW_SECONDS, ENCODING_VARIANT_ID, ROOT_SECRET, STANDARD_ALPHABET, CUSTOM_ALPHABET
+from globvars import PROTOCOL_VERSION, MAX_FRAME_SIZE, MIN_FRAME_SIZE, TIME_WINDOW_SECONDS, ENCODING_VARIANT_ID, ROOT_SECRET, STANDARD_ALPHABET, CUSTOM_ALPHABET, MAGIC_BYTES
 from datetime import datetime, timedelta
 import base64
+import struct # for binary packing/unpacking
+import zlib
 
 # Argon2id is a blend of the previous two variants. Argon2id should be used by most users, as recommended in RFC 9106. ; taken from the docs
 from cryptography.hazmat.primitives.kdf.argon2 import Argon2id
+from cryptography.hazmat.primitives import hashes, hmac 
 
 # This is the only instance of the controller that the bot will listen to
 # The bot can receive other commands from other services but it will ignore them
@@ -47,11 +50,9 @@ class AlphabetEncoder:
         self.encode_map = str.maketrans(standard_alphabet, custom_alphabet)
         self.decode_map = str.maketrans(custom_alphabet, standard_alphabet)
 
-    def encode(self, data: str) -> str:
-        # Standard base64 encoding
-        standard_encoded = base64.b64encode(data.encode()).decode()
-        custom_encoded = standard_encoded.translate(self.encode_map)
-        return custom_encoded
+    def encode(self, data:bytes) -> str:
+        std_encoded = base64.b64encode(data).decode()
+        return std_encoded.translate(self.encode_map)
 
     def decode(self, data: str) -> str:
         # Translate back to standard alphabet
@@ -67,29 +68,53 @@ class BotController:
         4) Obfuscation / Encoding
         5) Publishing / Receiving 
     '''
-    def __init__(self, secret_key: str = ROOT_SECRET, time_stamp: datetime = datetime.now().isoformat()):
+    def __init__(self, secret_key: str = ROOT_SECRET, time_stamp: str = None):
         self.secret = self._derive_session_key(secret_key, time_stamp)  
+        if time_stamp is None:
+            self.time_stamp = datetime.now().isoformat() 
+        print("Bot Controller initialized.")
 
-    def _derive_session_key(root_secret, time_stamp):
+    def _derive_session_key(self, root_secret, time_stamp):
         # Use Argon2id to derive a session key from the root secret and timestamp
+        salt = hashes.Hash(hashes.SHA256())
+        salt.update(time_stamp.encode())
+        salt = salt.finalize()[:16]  # Use first 16 bytes of the hash as salt
         kdf = Argon2id(
-            time_cost=2,
             memory_cost=102400,
-            parallelism=8,
             length=32,
-            salt=time_stamp.encode()
+            salt=salt,
+            iterations=2,
+            lanes=8,
         )
         session_key = kdf.derive(root_secret.encode())
         return session_key
 
+    def _compute_auth_tag(self, session_key: bytes, payload: bytes) -> bytes:
+        h = hmac.HMAC(session_key, hashes.SHA256())
+        h.update(payload)
+        return h.finalize()
+
     def _build_frame(self, cmd_type, payload) -> dict:
-        return {
-            "version": None,
-            "type": cmd_type,
-            "len": len(payload),
-            "ts": datetime().timestamp().isoformat(),
-            "payload": payload
-        }
+        if len(payload) > MAX_FRAME_SIZE:
+            raise ValueError("Payload size exceeds maximum frame size.")
+        if len(payload) < MIN_FRAME_SIZE:
+            raise ValueError("Payload size below minimum frame size.")
+        if not isinstance(payload, bytes):
+            raise TypeError("Payload must be of type bytes.")
+        
+        auth = self._compute_auth_tag(self.secret, payload)
+        checksum = zlib.crc32(payload) & 0xffffffff
+        return struct.pack(
+            f"!2s B B H 32s {len(payload)}s I",
+            MAGIC_BYTES,
+            PROTOCOL_VERSION,
+            cmd_type,
+            len(payload),
+            auth,
+            payload,
+            checksum
+        )
+
     
     def _encode_frame(self):
         pass
@@ -119,12 +144,18 @@ def main():
     print("Parsed arguments:", args)
 
     alphabet_encoder = AlphabetEncoder()
-    sample_data = "Hello, Bot Controller!"
-    encoded = alphabet_encoder.encode(sample_data)
-    decoded = alphabet_encoder.decode(encoded)
-    print(f"Original: {sample_data}")
-    print(f"Encoded: {encoded}")
-    print(f"Decoded: {decoded}")
+    bot_controller = BotController()
+    print(f"Derived session key: {bot_controller.secret}")
+
+    frame = bot_controller._build_frame(cmd_type=1, payload=b"Test Payload")
+    print(f"Built frame: {frame}")
+
+    # sample_data = "Hello, Bot Controller!"
+    # encoded = alphabet_encoder.encode(sample_data)
+    # decoded = alphabet_encoder.decode(encoded)
+    # print(f"Original: {sample_data}")
+    # print(f"Encoded: {encoded}")
+    # print(f"Decoded: {decoded}")
 
 if __name__ == "__main__":
     main()
