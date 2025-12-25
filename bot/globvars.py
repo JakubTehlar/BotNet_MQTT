@@ -12,7 +12,7 @@ ROOT_SECRET = "supersecretkey"  # Shared secret key for authentication
 MAGIC_BYTES = b'\xAB\xCD'  # Example magic bytes for frame start
 
 # Encoding 
-# It's not standard as after '/' are added special characters but the order is kept so therefore named standard
-STANDARD_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/!`@#$%^&*()-_=+[]{}|;:,.<>?"
-CUSTOM_ALPHABET = "ZYXWVUTSRQPONMLKJIHGFEDCBAzyxwvutsrqponmlkjihgfedcba9876543210+/!`@#$%^&*()-_=+[]{}|;:,.<>?"
+STANDARD_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+CUSTOM_ALPHABET   = "ZYXWVUTSRQPONMLKJIHGFEDCBAzyxwvutsrqponmlkjihgfedcba9876543210+/"
+
 
