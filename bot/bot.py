@@ -1,9 +1,6 @@
 import paho.mqtt.client as mqtt
 import base64
 
-DEFAULT_BROKER_ADDRESS = "147.32.82.209"
-DEFAULT_PORT = 1883
-DEFAULT_TOPIC = "sensors"
 
 class Client:
     def _on_connect(self, client, userdata, flags, reason_code, properties):
