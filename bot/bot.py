@@ -5,12 +5,11 @@ DEFAULT_PORT = 1883
 DEFAULT_TOPIC = "sensors"
 
 class Client:
-    
-    def _on_connect(self, userdata, flags, reason_code, properties):
+    def _on_connect(self, client, userdata, flags, reason_code, properties):
         print(f"Connected with result code {reason_code}")
-        self.client.subscribe(self.topic)
+        client.subscribe(self.topic)
     
-    def _on_message(self, userdata, message):
+    def _on_message(self, client, userdata, message):
         print(f"Message received on topic {message.topic}: {str(message.payload)}")
 
     def connect(self):
@@ -43,7 +42,10 @@ class Bot:
 
 
 def main():
-    pass
+    bot = Bot(broker_address=DEFAULT_BROKER_ADDRESS,
+              port=DEFAULT_PORT,
+              topic=DEFAULT_TOPIC)
+    bot.start()
 
 if __name__ == "__main__":
     main()
