@@ -132,8 +132,42 @@ class BotController:
     def _publish_frame(self):
         pass
 
-    def _decode_frame(self):
-        pass
+    def _decode_frame(self, data: bytes) -> bytes | None:
+        magic = MAGIC_BYTES
+        magic_index = data.find(magic)
+
+        # Fail
+        if magic_index == -1:
+            print("Magic bytes not found.")
+            return None
+
+        try:
+            header_size = struct.calcsize("!2s B B H 32s")
+            header = data[magic_index:magic_index + header_size]
+            (magic, version, cmd_type, length, auth) = struct.unpack("!2s B B H 32s", header)
+
+            payload_start = magic_index + header_size
+            payload_end = payload_start + length
+            payload = data[payload_start:payload_end]
+            checksum = struct.unpack("!I", data[payload_end:payload_end + 4])[0]
+        except Exception as e:
+            print(f"Failed to unpack frame: {e}")
+            return None
+        
+        if version != PROTOCOL_VERSION:
+            print("Version mismatch.")
+            return None
+        
+        if zlib.crc32(payload) & 0xffffffff != checksum:
+            print("Checksum mismatch.")
+            return None
+        
+        if not hmac.compare_digest(self._compute_auth_tag(self.secret, payload), auth): 
+            print("Authentication failed.")
+            return None
+
+        return payload 
+        
 
     def command_to_type(self, args) -> tuple[int, bytes]:
         if args.announce:
