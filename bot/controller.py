@@ -6,6 +6,8 @@ import struct # for binary packing/unpacking
 import zlib
 import os
 import random
+from protocol import ProtocolHandler
+
 
 # Argon2id is a blend of the previous two variants. Argon2id should be used by most users, as recommended in RFC 9106. ; taken from the docs
 from cryptography.hazmat.primitives.kdf.argon2 import Argon2id
@@ -71,10 +73,13 @@ class BotController:
         5) Publishing / Receiving 
     '''
     def __init__(self, secret_key: str = ROOT_SECRET, time_stamp: str = None):
-        self.secret = self._derive_session_key(secret_key, time_stamp)  
         if time_stamp is None:
             self.time_stamp = datetime.now().isoformat() 
+        self.secret = self._derive_session_key(secret_key, self.time_stamp)  
         print("Bot Controller initialized.")
+        print(f"Using timestamp: {self.time_stamp}")
+        print(f"Derived session key: {self.secret}")
+
 
     def _derive_session_key(self, root_secret, time_stamp):
         # Use Argon2id to derive a session key from the root secret and timestamp
@@ -91,82 +96,12 @@ class BotController:
         session_key = kdf.derive(root_secret.encode())
         return session_key
 
-    def _compute_auth_tag(self, session_key: bytes, payload: bytes) -> bytes:
-        h = hmac.HMAC(session_key, hashes.SHA256())
-        h.update(payload)
-        return h.finalize()
 
-    def _build_frame(self, cmd_type, payload) -> dict:
-        if len(payload) > MAX_FRAME_SIZE:
-            raise ValueError("Payload size exceeds maximum frame size.")
-        if len(payload) < MIN_FRAME_SIZE:
-            raise ValueError("Payload size below minimum frame size.")
-        if not isinstance(payload, bytes):
-            raise TypeError("Payload must be of type bytes.")
-        
-        auth = self._compute_auth_tag(self.secret, payload)
-        checksum = zlib.crc32(payload) & 0xffffffff
-        return struct.pack(
-            f"!2s B B H 32s {len(payload)}s I",
-            MAGIC_BYTES,
-            PROTOCOL_VERSION,
-            cmd_type,
-            len(payload),
-            auth,
-            payload,
-            checksum
-        )
+    # To a file for now
+    def _publish_frame(self, frame: bytes) :
+        with open("out_frame.bin", "wb") as f:
+            f.write(frame)
 
-    
-    def _encode_frame(self, frame: bytes) -> bytes:
-        # blend with the noise
-        pad_before = random.randint(0, 16)
-        pad_after = random.randint(0, 16)
-
-        prefix = os.urandom(pad_before)
-        suffix = os.urandom(pad_after)
-
-        blend_frame = prefix + frame + suffix
-        return blend_frame
-
-    def _publish_frame(self):
-        pass
-
-    def _decode_frame(self, data: bytes) -> bytes | None:
-        magic = MAGIC_BYTES
-        magic_index = data.find(magic)
-
-        # Fail
-        if magic_index == -1:
-            print("Magic bytes not found.")
-            return None
-
-        try:
-            header_size = struct.calcsize("!2s B B H 32s")
-            header = data[magic_index:magic_index + header_size]
-            (magic, version, cmd_type, length, auth) = struct.unpack("!2s B B H 32s", header)
-
-            payload_start = magic_index + header_size
-            payload_end = payload_start + length
-            payload = data[payload_start:payload_end]
-            checksum = struct.unpack("!I", data[payload_end:payload_end + 4])[0]
-        except Exception as e:
-            print(f"Failed to unpack frame: {e}")
-            return None
-        
-        if version != PROTOCOL_VERSION:
-            print("Version mismatch.")
-            return None
-        
-        if zlib.crc32(payload) & 0xffffffff != checksum:
-            print("Checksum mismatch.")
-            return None
-        
-        if not hmac.compare_digest(self._compute_auth_tag(self.secret, payload), auth): 
-            print("Authentication failed.")
-            return None
-
-        return payload 
         
 
     def command_to_type(self, args) -> tuple[int, bytes]:
@@ -204,11 +139,21 @@ def main():
     print("Parsed arguments:", args)
 
     alphabet_encoder = AlphabetEncoder()
+    protocol_handler = ProtocolHandler()
     bot_controller = BotController()
-    print(f"Derived session key: {bot_controller.secret}")
 
-    frame = bot_controller._build_frame(cmd_type=1, payload=b"Test Payload")
-    print(f"Built frame: {frame}")
+    cmd_type, payload = bot_controller.command_to_type(args)
+    frame = protocol_handler._build_frame(cmd_type, payload)
+    encoded_frame = protocol_handler._encode_frame(frame)
+
+    bot_controller._publish_frame(encoded_frame)
+    # # Testing encoding/decoding
+    decoded_frame = protocol_handler._decode_frame(encoded_frame)
+    if decoded_frame:
+        print("Frame decoded successfully. Payload:")
+        print(decoded_frame)
+    else:
+        print("Failed to decode frame.")
 
     # sample_data = "Hello, Bot Controller!"
     # encoded = alphabet_encoder.encode(sample_data)
