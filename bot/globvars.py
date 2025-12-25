@@ -3,8 +3,16 @@ DEFAULT_PORT = 1883
 DEFAULT_TOPIC = "sensors"
 
 # VERIFICATION VARIABLES
-PROTOCOL_VERSION = "1.0"
+PROTOCOL_VERSION = "1"
 MAX_FRAME_SIZE = 1024  # bytes; by far covers all commands
 MIN_FRAME_SIZE = 16    # bytes; minimum size to avoid trivial messages 
 TIME_WINDOW_SECONDS = 120  # 2 minutes time window for replay attack prevention
 ENCODING_VARIANT_ID = 1  # Identifier for the non-standard base64 alphabet
+ROOT_SECRET = "supersecretkey"  # Shared secret key for authentication
+MAGIC_BYTES = b'\xAB\xCD'  # Example magic bytes for frame start
+
+# Encoding 
+# It's not standard as after '/' are added special characters but the order is kept so therefore named standard
+STANDARD_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/!`@#$%^&*()-_=+[]{}|;:,.<>?"
+CUSTOM_ALPHABET = "ZYXWVUTSRQPONMLKJIHGFEDCBAzyxwvutsrqponmlkjihgfedcba9876543210+/!`@#$%^&*()-_=+[]{}|;:,.<>?"
+
