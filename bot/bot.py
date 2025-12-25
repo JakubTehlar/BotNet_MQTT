@@ -1,4 +1,5 @@
 import paho.mqtt.client as mqtt
+import base64
 
 DEFAULT_BROKER_ADDRESS = "147.32.82.209"
 DEFAULT_PORT = 1883
@@ -9,8 +10,17 @@ class Client:
         print(f"Connected with result code {reason_code}")
         client.subscribe(self.topic)
     
+    #     You must hide your communication and the controller should not be easily detected as 'bots' in the topic.
+    # Filter those messages meant for the bot
     def _on_message(self, client, userdata, message):
-        print(f"Message received on topic {message.topic}: {str(message.payload)}")
+        raw_payload = message.payload.decode()
+        try:
+            decoded = base64.b32decode(raw_payload).decode(errors="ignore")
+            print(f"Message received on topic {message.topic}: {decoded}")
+        except Exception as e:
+            print(f"(!) Failed to decode message: {e}")
+            print(f"Message received on topic {message.topic}: {raw_payload}")
+
 
     def connect(self):
         self.client.connect(self.broker_address, self.port)
