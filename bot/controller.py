@@ -73,7 +73,8 @@ class Publisher():
                  broker_address: str,
                  port: int,
                  topic: str, 
-                 secret_key: str):
+                 secret_key: str,
+                 time_delta: float=1):
         self.client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2) 
         self.broker = broker_address
         self.port = port 
@@ -84,6 +85,15 @@ class Publisher():
 
         self.client.on_connect = self.on_connect
         self.client.on_message = self.on_message
+        self.time_sent = 0
+        self.time_delta = time_delta
+    
+    def _shutdown(self):
+        try:
+            self.client.loop_stop()
+            self.client.disconnect()
+        except Exception:
+            pass
     
     def on_connect(self, client, userdata, flags, reason_code, properties):
         client.subscribe(self.topic)
@@ -91,10 +101,15 @@ class Publisher():
     def send(self, payload: bytes):
         self.client.connect(self.broker, self.port)
         status = self.client.publish(self.topic, payload)
+        self.time_sent = datetime.now()
+        print(self.time_sent)
         if status.rc != mqtt.MQTT_ERR_SUCCESS:
             print(f"Could not publish the message: {status.rc}")
+            self._shutdown()
+            return
         else:
             print(f"Successfully published!")
+        
         self.client.loop_forever()
         # self.client.loop_stop()
         # self.client.disconnect()
@@ -103,16 +118,16 @@ class Publisher():
         try:
             decoded_m = self.ph.decode_frame(message.payload)
             if self.ph.verify_frame_botmaster_side(decoded_m):
-                print("Message verified!")
+                print("Response verified!")
                 magic, ver, cmd_type, length, auth, payload, checksum = decoded_m
-                print(f"Response: {cmd_type};\nPayload: {payload}")
+                print(f"Response: {cmd_type};\nPayload: {payload.decode()}")
 
                 # disconnect
                 self.client.loop_stop()
                 self.client.disconnect()
 
         except Exception as e:
-            print(f"Exception: {e}")
+            pass
 
 
 def main():
