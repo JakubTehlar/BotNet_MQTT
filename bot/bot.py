@@ -1,12 +1,13 @@
 import paho.mqtt.client as mqtt
 import base64
 from globvars import DEFAULT_BROKER_ADDRESS, DEFAULT_PORT, DEFAULT_TOPIC
-from controller import BotController
 from globvars import STANDARD_ALPHABET, CUSTOM_ALPHABET, ROOT_SECRET
 from datetime import datetime
 import hmac
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.argon2 import Argon2id
+from protocol import ProtocolHandler
+from controller import BotController
 
 class Client:
     def _on_connect(self, client, userdata, flags, reason_code, properties):
@@ -55,10 +56,21 @@ class Bot:
 
 
 def main():
-    bot = Bot(broker_address=DEFAULT_BROKER_ADDRESS,
-              port=DEFAULT_PORT,
-              topic=DEFAULT_TOPIC)
-    bot.start()
+    # bot = Bot(broker_address=DEFAULT_BROKER_ADDRESS,
+    #           port=DEFAULT_PORT,
+    #           topic=DEFAULT_TOPIC)
+    # bot.start()
+    bot_cont = BotController()
+    message = ""
+    with open("out_frame.bin", "rb") as f:
+        message = f.read()
+    print("Loaded message from out_frame.bin")
+    protocol_handler = ProtocolHandler(secret=bot_cont.secret)
+    decoded_m = protocol_handler.decode_frame(message)
+    print(protocol_handler.verify_frame(decoded_m))
+
+    # unpack the message
+    magic, ver, cmd_type, length, auth, payload, checksum = decoded_m
 
 if __name__ == "__main__":
     main()
