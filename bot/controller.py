@@ -1,5 +1,5 @@
 import argparse
-from globvars import PROTOCOL_VERSION, MAX_FRAME_SIZE, MIN_FRAME_SIZE, TIME_WINDOW_SECONDS, ENCODING_VARIANT_ID, ROOT_SECRET, STANDARD_ALPHABET, CUSTOM_ALPHABET, MAGIC_BYTES, CMD_TYPES
+from globvars import PROTOCOL_VERSION, MAX_FRAME_SIZE, MIN_FRAME_SIZE, TIME_WINDOW_SECONDS, ENCODING_VARIANT_ID, ROOT_SECRET, STANDARD_ALPHABET, CUSTOM_ALPHABET, MAGIC_BYTES, CMD_TYPES, SALT
 from datetime import datetime, timedelta
 import base64
 import struct # for binary packing/unpacking
@@ -72,19 +72,19 @@ class BotController:
         4) Obfuscation / Encoding
         5) Publishing / Receiving 
     '''
-    def __init__(self, secret_key: str = ROOT_SECRET, time_stamp: str = None):
-        if time_stamp is None:
-            self.time_stamp = datetime.now().isoformat() 
-        self.secret = self._derive_session_key(secret_key, self.time_stamp)  
+    def __init__(self, secret_key: str = ROOT_SECRET):
+        # if time_stamp is None:
+        #     self.time_stamp = datetime.now().isoformat() 
+        # self.secret = self._derive_session_key(secret_key, self.time_stamp)  
+        self.secret = self._derive_session_key(secret_key)  
         print("Bot Controller initialized.")
-        print(f"Using timestamp: {self.time_stamp}")
+        # print(f"Using timestamp: {self.time_stamp}")
         print(f"Derived session key: {self.secret}")
 
-
-    def _derive_session_key(self, root_secret, time_stamp):
+    def _derive_session_key(self, root_secret):
         # Use Argon2id to derive a session key from the root secret and timestamp
         salt = hashes.Hash(hashes.SHA256())
-        salt.update(time_stamp.encode())
+        salt.update(SALT.encode())
         salt = salt.finalize()[:16]  # Use first 16 bytes of the hash as salt
         kdf = Argon2id(
             memory_cost=102400,
@@ -101,8 +101,6 @@ class BotController:
     def _publish_frame(self, frame: bytes) :
         with open("out_frame.bin", "wb") as f:
             f.write(frame)
-
-        
 
     def command_to_type(self, args) -> tuple[int, bytes]:
         if args.announce:
@@ -138,29 +136,15 @@ def main():
     args = parser.parse_args()
     print("Parsed arguments:", args)
 
-    alphabet_encoder = AlphabetEncoder()
-    protocol_handler = ProtocolHandler()
     bot_controller = BotController()
+    protocol_handler = ProtocolHandler(secret=bot_controller.secret)
 
     cmd_type, payload = bot_controller.command_to_type(args)
-    frame = protocol_handler._build_frame(cmd_type, payload)
-    encoded_frame = protocol_handler._encode_frame(frame)
+    frame = protocol_handler.build_frame(cmd_type, payload)
+    encoded_frame = protocol_handler.encode_frame(frame)
 
+    # locally save to a file
     bot_controller._publish_frame(encoded_frame)
-    # # Testing encoding/decoding
-    decoded_frame = protocol_handler._decode_frame(encoded_frame)
-    if decoded_frame:
-        print("Frame decoded successfully. Payload:")
-        print(decoded_frame)
-    else:
-        print("Failed to decode frame.")
-
-    # sample_data = "Hello, Bot Controller!"
-    # encoded = alphabet_encoder.encode(sample_data)
-    # decoded = alphabet_encoder.decode(encoded)
-    # print(f"Original: {sample_data}")
-    # print(f"Encoded: {encoded}")
-    # print(f"Decoded: {decoded}")
 
 if __name__ == "__main__":
     main()
