@@ -1,11 +1,9 @@
 import paho.mqtt.client as mqtt
 import base64
 from globvars import DEFAULT_BROKER_ADDRESS, DEFAULT_PORT, DEFAULT_TOPIC, CMD_TYPES, RESP_TYPES, ROOT_SECRET, SALT
-import hmac
 from datetime import datetime
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.argon2 import Argon2id
-from protocol import ProtocolHandler
 import subprocess
 
 class BotController:
@@ -47,10 +45,9 @@ class BotController:
         session_key = kdf.derive(root_secret.encode())
         return session_key
 
-    # To a file for now
     def _publish_frame(self, frame: bytes) :
-        with open("out_frame.bin", "wb") as f:
-            f.write(frame)
+        self.client.publish(frame)
+
 
     def command_to_type(self, args) -> tuple[int, bytes]:
         if args.announce:
@@ -150,9 +147,32 @@ class Client:
         except Exception as e:
             print(f"(!) Failed to decode message: {e}")
             print(f"Message received on topic {message.topic}: {raw_payload}")
+
     def connect(self):
         self.client.connect(self.broker_address, self.port)
         self.client.loop_forever()
+    
+    def disconnect(self):
+        self.client.loop_stop()
+        self.client.disconnect()
+    
+    def publish(self, payload: bytes, qos: int=0, retain: bool=False):
+        if not isinstance(payload, (bytes, bytearray)):
+            raise TypeError("Payload must be bytes")
+
+        result = self.client.publish(
+            topic=self.topic,
+            payload=payload,
+            qos=qos,
+            retain=retain
+        )
+
+        status = result.rc
+        if (status != mqtt.MQTT_ERR_SUCCESS):
+            print(f"Failed to publish message (rc={status})")
+        else:
+            print(f"Successfully published!")
+
 
     def __init__(self,
                  broker_address:str,
