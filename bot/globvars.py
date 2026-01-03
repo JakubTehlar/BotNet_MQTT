@@ -21,7 +21,13 @@ CMD_TYPES = {
     "user_id": 0x04,
     "copy_file": 0x05,
     "exec_binary": 0x06,
-    "stop":0xFF
+    "kill":0xFF
+}
+
+RESP_TYPES = {
+    "ok": 0x80,
+    "error":0x81,
+    "data": 0x82
 }
 
 # Encoding 
