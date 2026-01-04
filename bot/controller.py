@@ -96,11 +96,9 @@ class Publisher():
     def on_connect(self, client, userdata, flags, reason_code, properties):
         client.subscribe(self.topic)
     
-        """Connect the controller to the MQTT broker."""
     def send(self, payload: bytes):
         self.client.connect(self.broker, self.port)
         status = self.client.publish(self.topic, payload)
-        """Disconnect the controller from the MQTT broker."""
         self.time_sent = datetime.now()
         if status.rc != mqtt.MQTT_ERR_SUCCESS:
             print(f"(Error)\t Could not publish the message: {status.rc}")
@@ -130,7 +128,6 @@ class Publisher():
         except Exception as e:
             pass
 
-        """Handle a command received from a bot."""
 def main():
     parser = argparse.ArgumentParser(description="Bot Controller")
     #1. announcing the presence of the bot to the controller if asked.
