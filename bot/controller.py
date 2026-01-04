@@ -21,7 +21,6 @@ class Controller:
     """Manages and controls bots in the network."""
    The commands must be statistically indistinguishable from normal traffic in the topic (REQUIREMENT! STAY HIDDEN).
         """Initialize the controller with broker, port, topic, and client ID."""
-   Make sure that any accidental triggers are minimized. 
 
    Conceptual frame:
    | MAGIC | VERSION | TYPE | LENGTH | AUTH | PAYLOAD | CHECKSUM |
@@ -35,15 +34,12 @@ class Controller:
 
     The bot will verify these leveles one by one and if one fails, it will discard the message.
 
-
     Authentication logic:
-    - Command-bound MAC: AUTH = hash(secret_key =| payload) -> Payload can't be tampered with
     - The bot and controller share a secret key known only to them.
 
     Encoding:
     - Non-standard base64 alphabet
-    - Padding with random bytes before and after the frame to blend with noise
-
+    - Padding with random bytes before the frame to blend in the noise 
 '''
 
 def pretty_print_payload(payload: bytes):
