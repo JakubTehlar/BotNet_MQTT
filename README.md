@@ -136,7 +136,6 @@ You can only use one command option at a time. See the source code for more adva
 
 - HMAC authentication for all messages
 - Random padding and custom encoding for stealth
-- Replay attack prevention using time windows
 
 ## File Structure
 
