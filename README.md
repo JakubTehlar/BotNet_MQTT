@@ -21,23 +21,39 @@ Communication between the Controller and Bots is performed using a custom binary
 
 Frames are padded with random bytes and encoded using a non-standard base64 alphabet to blend with normal traffic and avoid detection.
 
-## Bot
 
-The Bot listens for commands from the Controller on a specified MQTT topic (specified in either `bot/globvars.py` or `bot/bot.py` and `bot/controller.py`). It verifies message authenticity using a shared secret and only executes valid commands. Supported commands include:
+## Protocol Design and Security Philosophy
 
-- Announce presence (heartbeat / ping)
-- List users
-- List directory contents
-- Get user ID
-- Copy files
-- Execute binaries
-- Kill (terminate)
+The protocol is designed to be stealthy and secure:
 
-The Bot responds to commands with status and data, using the same protocol for replies.
+- **Stealth:** Frames are padded with random bytes and encoded using a custom base64 alphabet to blend with normal MQTT traffic, making detection harder.
+- **Authentication:** Every command is authenticated using HMAC with a shared secret. Bots only execute commands that pass all verification steps.
+- **Integrity:** Each frame includes a CRC32 checksum to ensure data integrity.
+- **Replay Protection:** The protocol can include time windows to prevent replay attacks.
 
-## Controller
+## Bot Logic
 
-The Controller sends commands to the Bot in the following way. It builds protocol frames, encodes them, and publishes to the topic. The Controller expects a response and verifies their authenticity. Only the Controller with the correct secret can control the Bot.
+The Bot acts as a passive agent, waiting for commands on a specified MQTT topic. Its logic is as follows:
+
+1. **Listening:** The bot subscribes to the MQTT topic and waits for incoming messages.
+2. **Verification:** Upon receiving a message, the bot:
+    - Checks the MAGIC bytes and protocol version.
+    - Verifies the command type is valid.
+    - Checks the CRC32 checksum for integrity.
+    - Authenticates the message using HMAC and the shared secret.
+3. **Command Handling:** If all checks pass, the bot dispatches the command to the appropriate handler (e.g., list users, execute binary, etc.).
+4. **Response:** The bot sends a response (status/data) back to the controller using the same protocol, ensuring authenticity and integrity.
+5. **Security:** If any check fails, the message is ignored and not executed.
+
+## BotMaster (Controller) Logic
+
+The BotMaster (Controller) is responsible for sending commands and receiving responses:
+
+1. **Command Construction:** The controller builds a command frame, including all protocol fields, and authenticates it with HMAC.
+2. **Encoding:** The frame is padded and encoded for stealth.
+3. **Publishing:** The controller publishes the command to the MQTT topic.
+4. **Response Handling:** The controller listens for responses from bots, verifies their authenticity, and displays the results.
+5. **Access Control:** Only controllers with the correct secret can send valid commands; all others are ignored by bots.
 
 ## Running the Program
 
