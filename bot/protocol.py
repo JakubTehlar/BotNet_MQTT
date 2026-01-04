@@ -38,9 +38,10 @@ class ProtocolHandler:
         blend_frame = frame + suffix
         return blend_frame
 
-
     def decode_frame(self, data: bytes) -> tuple | None:
         magic_index = 0
+        if len(data) < struct.calcsize("!2s B B H 32s"):
+            return None
         try:
             header_size = struct.calcsize("!2s B B H 32s")
             header = data[magic_index:magic_index + header_size]
@@ -48,15 +49,14 @@ class ProtocolHandler:
 
             payload_start = magic_index + header_size
             payload_end = payload_start + length
-            payload = data[payload_start:payload_end]
             if payload_end + 4 > len(data):
                 return None
+            payload = data[payload_start:payload_end]
             checksum = struct.unpack("!I", data[payload_end:payload_end + 4])[0]
             return (magic, version, cmd_type, length, auth, payload, checksum) 
         except Exception as e:
             print(f"(Error)\t Failed to unpack frame: {e}")
             return None
-
 
     def verify_frame_bot_side(self, data: tuple) -> bool: 
         (magic, version, cmd_type, length, auth, payload, checksum) = data
@@ -72,6 +72,7 @@ class ProtocolHandler:
             print("(Error)\t Version mismatch.")
             return False
         
+        """Build a frame for the given command type and payload."""
         if zlib.crc32(payload) & 0xffffffff != checksum:
             print("(Error)\t Checksum mismatch.")
             return False
