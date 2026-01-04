@@ -1,5 +1,5 @@
 import paho.mqtt.client as mqtt
-from globvars import DEFAULT_BROKER_ADDRESS, DEFAULT_PORT, DEFAULT_TOPIC, CMD_TYPES, RESP_TYPES, ROOT_SECRET, SALT, CHUNK_SIZE, MAGIC_BYTES
+from globvars import DEFAULT_BROKER_ADDRESS, DEFAULT_PORT, DEFAULT_TOPIC, CMD_TYPES, RESP_TYPES, ROOT_SECRET, SALT, MAGIC_BYTES
 from datetime import datetime
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.argon2 import Argon2id
