@@ -1,18 +1,3 @@
-## Controller CLI Options
-
-The controller supports the following command-line options:
-
-| Option           | Description                                                        | Example Usage                          |
-|------------------|--------------------------------------------------------------------|----------------------------------------|
-| --announce       | Announce the bot's presence to the controller                      | python bot/controller.py --announce    |
-| --list-users     | List users currently logged in on the bot                          | python bot/controller.py --list-users  |
-| --list-dir DIR   | List contents of the specified directory on the bot                | python bot/controller.py --list-dir /tmp |
-| --user-id        | Get the user ID of the bot process                                | python bot/controller.py --user-id     |
-| --kill           | Kill (terminate) the bot process                                  | python bot/controller.py --kill        |
-| --copy-file PATH | Copy the specified file from the bot to the controller             | python bot/controller.py --copy-file /etc/passwd |
-| --exec-binary BIN| Execute the specified binary on the bot                            | python bot/controller.py --exec-binary /usr/bin/ps |
-
-You can only use one command option at a time. See the source code for more advanced usage.
 
 # BotNet_MQTT
 
@@ -85,6 +70,21 @@ The Controller sends commands to the Bot in the following way. It builds protoco
 	 ```
 	 Use CLI arguments to specify commands (see source for details).
 
+#### Controller CLI Options
+
+The controller supports the following command-line options:
+
+| Option           | Description                                                        | Example Usage                          |
+|------------------|--------------------------------------------------------------------|----------------------------------------|
+| --announce       | Announce the bot's presence to the controller                      | python bot/controller.py --announce    |
+| --list-users     | List users currently logged in on the bot                          | python bot/controller.py --list-users  |
+| --list-dir DIR   | List contents of the specified directory on the bot                | python bot/controller.py --list-dir /tmp |
+| --user-id        | Get the user ID of the bot process                                | python bot/controller.py --user-id     |
+| --kill           | Kill (terminate) the bot process                                  | python bot/controller.py --kill        |
+| --copy-file PATH | Copy the specified file from the bot to the controller             | python bot/controller.py --copy-file /etc/passwd |
+| --exec-binary BIN| Execute the specified binary on the bot                            | python bot/controller.py --exec-binary /usr/bin/ps |
+
+You can only use one command option at a time. See the source code for more advanced usage.
 ## Security Features
 
 - HMAC authentication for all messages
