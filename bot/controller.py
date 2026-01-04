@@ -98,12 +98,11 @@ class Publisher():
         self.time_sent = datetime.now()
         print(self.time_sent)
         if status.rc != mqtt.MQTT_ERR_SUCCESS:
-            print(f"Could not publish the message: {status.rc}")
+            print(f"(Error)\t Could not publish the message: {status.rc}")
             self._shutdown()
             return
         else:
-            print(f"Successfully published!")
-        
+            print(f"(Info)\t Successfully published!")
         self.client.loop_forever()
     
     def on_message(self, client, userdata, message):
@@ -113,7 +112,8 @@ class Publisher():
                 magic, ver, cmd_type, length, auth, payload, checksum = decoded_m
                 response_idx = list(RESP_TYPES.values()).index(cmd_type)
                 response = list(RESP_TYPES.keys())[response_idx]
-                print(f"Response: {response};\nPayload: {payload.decode()}")
+                print("(Info)\t Received response from the bot!")
+                print(f"\t Response: {response}\n\t Payload: {payload.decode()}")
 
                 # disconnect
                 self.client.loop_stop()
@@ -121,7 +121,6 @@ class Publisher():
 
         except Exception as e:
             pass
-
 
 def main():
     parser = argparse.ArgumentParser(description="Bot Controller")
@@ -140,7 +139,6 @@ def main():
     parser.add_argument("--exec-binary", type=str, required=False)
 
     args = parser.parse_args()
-    print("Parsed arguments:", args)
 
     # init bot master
     publisher = Publisher(DEFAULT_BROKER_ADDRESS, DEFAULT_PORT, DEFAULT_TOPIC, ROOT_SECRET)
@@ -148,9 +146,7 @@ def main():
     cmd_type, payload = publisher.bot_master.command_to_type(args)
     frame = publisher.ph.build_frame(cmd_type, payload)
     encoded_frame = publisher.ph.encode_frame(frame)
-
     publisher.send(encoded_frame)
-
 
 if __name__ == "__main__":
     main()
