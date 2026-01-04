@@ -85,10 +85,10 @@ class BotController:
                                         capture_output=True,
                                         text=True)
             if subp_command.returncode != 0:
-                return RESP_TYPES["error"], subp_command.stderr
+                return RESP_TYPES["error"], subp_command.stderr.encode()
+            return RESP_TYPES["ok"], subp_command.stdout.encode()
         except Exception as e:
-            return RESP_TYPES["error"], e.encode() 
-        return RESP_TYPES["ok"], subp_command.stdout
+            return RESP_TYPES["error"], str(e).encode() 
 
     def handle_user_id(self, payload: bytes):
         # run id 
