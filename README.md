@@ -22,7 +22,7 @@ Communication between the Controller and Bots is performed using a custom binary
 Frames are padded with random bytes and encoded using a non-standard base64 alphabet to blend with normal traffic and avoid detection.
 
 
-## Protocol Design and Security Philosophy
+## Protocol Logic 
 
 The protocol is designed to be stealthy and secure:
 
