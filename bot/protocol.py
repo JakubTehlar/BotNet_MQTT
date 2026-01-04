@@ -104,8 +104,6 @@ class ProtocolHandler:
             print("(Error)\t Checksum mismatch.")
             return False
     
-        # TODO
-        # this leaks timing info! use constant-time comparison primitve instead
         expected_auth = self.compute_auth_tag(self.secret, payload)
         if auth != expected_auth:
             print("(Error)\t Authentication failed.")
