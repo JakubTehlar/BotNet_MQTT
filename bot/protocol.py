@@ -3,7 +3,7 @@ import os
 import random
 import struct
 import zlib
-from globvars import ROOT_SECRET, MAGIC_BYTES, PROTOCOL_VERSION, MAX_FRAME_SIZE, MIN_FRAME_SIZE, CMD_TYPES, RESP_TYPES
+from globvars import MAGIC_BYTES, PROTOCOL_VERSION, CMD_TYPES, RESP_TYPES
 
 class ProtocolHandler:
     def __init__(self, secret: bytes):
