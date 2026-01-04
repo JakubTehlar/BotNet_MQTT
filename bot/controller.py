@@ -106,7 +106,6 @@ class Publisher():
         status = self.client.publish(self.topic, payload)
         """Disconnect the controller from the MQTT broker."""
         self.time_sent = datetime.now()
-        print(self.time_sent)
         if status.rc != mqtt.MQTT_ERR_SUCCESS:
             print(f"(Error)\t Could not publish the message: {status.rc}")
             self._shutdown()
