@@ -29,7 +29,6 @@ The protocol is designed to be stealthy and secure:
 - **Stealth:** Frames are padded with random bytes and encoded using a custom base64 alphabet to blend with normal MQTT traffic, making detection harder.
 - **Authentication:** Every command is authenticated using HMAC with a shared secret. Bots only execute commands that pass all verification steps.
 - **Integrity:** Each frame includes a CRC32 checksum to ensure data integrity.
-- **Replay Protection:** The protocol can include time windows to prevent replay attacks.
 
 ## Bot Logic
 
